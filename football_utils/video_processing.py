@@ -1,76 +1,93 @@
 import cv2
 import os
 import time
-import numpy as np
-from football_utils.detection import detect_objects
-from football_utils.tracking import calculate_optical_flow, apply_perspective_transform
-from football_utils.team_assignment import assign_teams
-from football_utils.llm_inference import classify_output
-
+import traceback
 
 def process_video(input_video_path, output_folder):
+    print(f"[SIMPLIFIED_PROCESS] Starting for: {input_video_path}")
     cap = cv2.VideoCapture(input_video_path)
-    fourcc = cv2.VideoWriter_fourcc(*'avc1')
+    if not cap.isOpened():
+        print(f"[SIMPLIFIED_PROCESS] Error: Could not open input video.")
+        return None, "Input Video Error"
+
     fps = cap.get(cv2.CAP_PROP_FPS)
-    width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    
-    output_video_path = os.path.join(output_folder, f"output_{int(time.time())}.mp4")
-    out = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
-    
-    ret, prev_frame = cap.read()
-    if not ret:
+    print(f"[SIMPLIFIED_PROCESS] Input Props: {width}x{height} @ {fps:.2f} FPS")
+
+    if width <= 0 or height <= 0 or fps <= 0:
+         print(f"[SIMPLIFIED_PROCESS] Error: Invalid video properties.")
+         cap.release()
+         return None, "Invalid Properties"
+
+    # Use AVI / XVID as it's often simpler/more robust
+    fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    output_filename = f"test_output_{int(time.time())}.avi"
+    output_path = os.path.join(output_folder, output_filename)
+    print(f"[SIMPLIFIED_PROCESS] Attempting to write to: {output_path}")
+
+    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+    if not out.isOpened():
+        print(f"[SIMPLIFIED_PROCESS] Error: Failed to open VideoWriter.")
         cap.release()
-        out.release()
-        return None
+        return None, "VideoWriter Open Error"
 
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
+    frame_count = 0
+    write_success = True
+    final_output_path = None
 
-        # 1. Object Detection
-        detections = detect_objects(frame)
-        
-        # 2. Team Assignment (using KMeans on color features)
-        team_assignments = assign_teams(frame, detections)
-        
-        # 3. Optical Flow (if needed for camera movement)
-        flow = calculate_optical_flow(prev_frame, frame)
-        
-        # 4. Perspective Transformation (example: identity transform here)
-        # In practice, define src_points and dst_points based on your camera calibration.
-        src_points =  np.float32([[0,0], [width,0], [width,height], [0,height]])
-        dst_points = np.float32([[0,0], [width,0], [width,height], [0,height]])
-        transformed_frame = apply_perspective_transform(frame, src_points, dst_points)
-        
-        # 5. Overlay detections and team assignments on frame.
-        for i, det in enumerate(detections):
-            xmin, ymin, xmax, ymax = int(det['xmin']), int(det['ymin']), int(det['xmax']), int(det['ymax'])
-            label = det['name']
-            # Add team information if available.
-            if label == "person" and i in team_assignments:
-                label += f" | Team {team_assignments[i]}"
-            cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2)
-            cv2.putText(frame, label, (xmin, ymin - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-        
-        # Write the processed frame to the output video.
-        out.write(frame)
-        prev_frame = frame.copy()
-    
-    cap.release()
-    out.release()
-    
-    # 6. After processing video, you can generate a summary and run LLM classification.
-    summary_text = "Analysis complete. Player detection, team assignment, and movement tracking executed."
-    classification = classify_output(summary_text)
-    # If classification is something like [{'label': 'POSITIVE', 'score': 0.9998}], parse it:
-    if classification and isinstance(classification, list):
-        label = classification[0].get('label', 'N/A')
-        score = classification[0].get('score', 0.0)
-        classification_str = f"Label: {label}, Score: {score:.4f}"
+    try:
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            frame_count += 1
+            if frame is None:
+                 print(f"[SIMPLIFIED_PROCESS] Read None frame at index {frame_count}, skipping.")
+                 continue
+
+            # *** NO PROCESSING - Just write the raw frame ***
+            try:
+                out.write(frame)
+            except Exception as e:
+                 print(f"[SIMPLIFIED_PROCESS] Error writing frame {frame_count}: {e}")
+                 print(traceback.format_exc())
+                 write_success = False
+                 break # Stop if writing fails
+
+        print(f"[SIMPLIFIED_PROCESS] Finished reading {frame_count} frames.")
+
+    except Exception as e:
+        print(f"[SIMPLIFIED_PROCESS] Error during read/write loop: {e}")
+        print(traceback.format_exc())
+        write_success = False
+    finally:
+        print("[SIMPLIFIED_PROCESS] Releasing resources...")
+        cap.release()
+        out.release() # Essential to finalize the file
+        print("[SIMPLIFIED_PROCESS] Resources released.")
+
+    # Check if file was created
+    if write_success and os.path.exists(output_path):
+        try:
+            file_size = os.path.getsize(output_path)
+            if file_size > 0:
+                print(f"[SIMPLIFIED_PROCESS] Output file successfully created: {output_path} ({file_size} bytes)")
+                final_output_path = output_path
+            else:
+                print(f"[SIMPLIFIED_PROCESS] Error: Output file exists but is empty: {output_path}")
+        except OSError as e:
+            print(f"[SIMPLIFIED_PROCESS] Error checking output file size: {e}")
+    elif write_success:
+         print(f"[SIMPLIFIED_PROCESS] Error: Loop finished but output file not found: {output_path}")
     else:
-        classification_str = str(classification)  # fallback
-    print("LLM Classification:", classification)
-    
-    return output_video_path,classification_str
+         print(f"[SIMPLIFIED_PROCESS] Error: Loop did not complete successfully or writing failed.")
+         # Clean up potentially corrupt file
+         if os.path.exists(output_path):
+             try: os.remove(output_path)
+             except OSError as e: print(f"Error removing temp file: {e}")
+
+
+    # Return dummy classification for compatibility with Cell 3 structure
+    return final_output_path, "Simplified Test Run"
