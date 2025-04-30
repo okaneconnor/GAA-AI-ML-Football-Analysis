@@ -1,8 +1,9 @@
 import torch
 import cv2
 import numpy as np
-from ultralytics import YOLO # <<< Import the YOLO class
-import os # <<< Import os for path handling
+from ultralytics import YOLO # Import the YOLO class
+import os
+import traceback # For better error reporting
 
 # --- Device Selection (Corrected for Colab/CUDA) ---
 if torch.cuda.is_available():
@@ -16,25 +17,33 @@ else:
     print("[DETECTION] Using CPU")
 
 # --- Load YOLOv11 Model using ultralytics API ---
-# Use the absolute path from your Colab environment
-# IMPORTANT: Ensure this path matches where Cell 3 downloaded the model
-model_abs_path = "/content/models/yolo11n.pt" # <<< Use absolute path
+# Define the desired model identifier. YOLO() will handle download if the file
+# doesn't exist in the directory specified (or default cache).
+# Ensure the DIRECTORY (/content/models/) exists, which Cell 3 does.
+model_identifier = "/content/models/yolo11n.pt"
+# Or you could just use the name, and let ultralytics manage cache:
+# model_identifier = "yolo11n.pt"
 
-if os.path.exists(model_abs_path):
-    print(f"[DETECTION] Loading model from: {model_abs_path}")
-    try:
-        model = YOLO(model_abs_path) # <<< Use the YOLO class
-        model.to(device) # Move model to the selected device
-        # No explicit model.eval() needed, YOLO handles modes internally
-        print(f"[DETECTION] Model loaded successfully onto {device}.")
-    except Exception as e:
-        print(f"[DETECTION] Error loading model: {e}")
-        model = None # Set model to None if loading failed
-else:
-    print(f"[DETECTION] Error: Model file not found at {model_abs_path}")
-    model = None
+print(f"[DETECTION] Attempting to load/download model: {model_identifier}")
+model = None # Initialize model to None
+try:
+    # *** REMOVED the os.path.exists() check ***
+    # Let YOLO() handle download automatically if the file doesn't exist
+    model = YOLO(model_identifier)
+    model.to(device) # Move model to the selected device
+    print(f"[DETECTION] Model '{model_identifier}' loaded successfully onto {device}.")
+    # Verify model names attribute is loaded
+    if not hasattr(model, 'names') or not model.names:
+         print("[DETECTION] Warning: model.names not found after loading.")
+    # else:
+    #      print(f"[DETECTION] Model class names: {model.names}") # Optional: print names
 
-# --- Detect Objects Function (Updated for ultralytics Results) ---
+except Exception as e:
+    print(f"[DETECTION] Error loading model '{model_identifier}': {e}")
+    print(traceback.format_exc())
+    # model remains None
+
+# --- Detect Objects Function ---
 def detect_objects(frame):
     """
     Perform object detection on a frame using the loaded YOLO model.
@@ -43,42 +52,52 @@ def detect_objects(frame):
     detections = [] # Initialize empty list
 
     if model is None:
-        print("[DETECTION] Error: Model not loaded, cannot perform detection.")
-        return detections # Return empty list if model failed to load
+        # This message should now only appear if the YOLO() call above truly failed
+        print("[DETECTION] Error: Model is not loaded, cannot perform detection.")
+        return detections # Return empty list
+
+    # Check if model has class names (needed for formatting output)
+    if not hasattr(model, 'names') or not model.names:
+        print("[DETECTION] Error: Model loaded but class names (model.names) are missing.")
+        return detections
 
     # Perform inference using the ultralytics model
-    # No need to convert color (YOLO handles BGR/RGB automatically)
-    # Set verbose=False to avoid excessive console output from predict
     try:
         results = model.predict(source=frame, device=device, verbose=False)
     except Exception as e:
         print(f"[DETECTION] Error during model prediction: {e}")
+        print(traceback.format_exc())
         return detections # Return empty list on prediction error
 
-
-    # Process results (results is a list, usually with one element for one image)
+    # Process results
     if results and results[0].boxes:
-        boxes = results[0].boxes # Get the Boxes object
-
-        # Iterate through detected boxes
+        boxes = results[0].boxes
         for i in range(len(boxes)):
-            # Extract data (accessing attributes of the Boxes object)
-            # .data gives a tensor with [xmin, ymin, xmax, ymax, conf, cls]
-            box_data = boxes.data[i].cpu().numpy() # Get as numpy array on CPU
-            xmin, ymin, xmax, ymax, conf, cls_id = box_data
+            try:
+                box_data = boxes.data[i].cpu().numpy()
+                xmin, ymin, xmax, ymax, conf, cls_id_float = box_data
+                cls_id = int(cls_id_float) # Convert class ID to integer
 
-            # Get class name from model metadata
-            class_name = model.names[int(cls_id)]
+                # Get class name from model metadata, handle potential IndexError
+                if 0 <= cls_id < len(model.names):
+                     class_name = model.names[cls_id]
+                else:
+                     print(f"[DETECTION] Warning: Invalid class ID {cls_id} detected.")
+                     class_name = "unknown"
 
-            # Append detection in the desired dictionary format
-            detections.append({
-                'xmin': xmin,
-                'ymin': ymin,
-                'xmax': xmax,
-                'ymax': ymax,
-                'confidence': conf,
-                'class': int(cls_id), # Keep class ID as int
-                'name': class_name  # Class name string
-            })
+                detections.append({
+                    'xmin': xmin,
+                    'ymin': ymin,
+                    'xmax': xmax,
+                    'ymax': ymax,
+                    'confidence': conf,
+                    'class': cls_id,
+                    'name': class_name
+                })
+            except IndexError:
+                 print(f"[DETECTION] Error accessing detection data at index {i}. Box data: {boxes.data[i]}")
+            except Exception as proc_err:
+                 print(f"[DETECTION] Error processing detection at index {i}: {proc_err}")
+
 
     return detections
