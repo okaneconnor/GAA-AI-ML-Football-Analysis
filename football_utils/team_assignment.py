@@ -141,3 +141,4 @@ def assign_teams(frame, player_detections):
         print(f"Error during KMeans clustering for team assignment: {e}")
         print(traceback.format_exc())
         return {} # Return empty on clustering error
+        

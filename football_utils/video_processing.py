@@ -229,3 +229,4 @@ def process_video(input_video_path, output_folder):
 
     print(f"{log_prefix}Returning path: {final_output_path}, classification: {classification_str}")
     return final_output_path, classification_str
+    
