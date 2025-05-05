@@ -16,29 +16,24 @@ else:
     device = torch.device("cpu")
     print("[DETECTION] Using CPU")
 
-# --- Load YOLOv11 Model (Original Logic - Module Level) ---
-# IMPORTANT: This path is hardcoded based on your original script.
-# Ensure your 'yolo11n.pt' file is EXACTLY at '/content/models/yolo11n.pt'
-model_identifier = "/content/models/yolo11n.pt"
-print(f"[DETECTION] Attempting to load model directly: {model_identifier}")
+# --- Load YOLOv11 Model (Module Level - Using Name for Auto-Download) ---
+# Use the model NAME - the library will download it if not cached.
+# Ensure internet connection is available in your environment for first run.
+model_identifier = "yolo11n.pt" # Use the NAME, not a specific path
+print(f"[DETECTION] Requesting model: {model_identifier} (will download if needed)")
 model = None # Initialize model variable globally within this module
 try:
-    if not os.path.exists(model_identifier):
-         raise FileNotFoundError(f"Model file not found at the required path: {model_identifier}")
-
+    # Pass the NAME to YOLO() - it handles download/cache check
     model = YOLO(model_identifier)
     model.to(device)
-    print(f"[DETECTION] Model '{model_identifier}' loaded successfully onto {device}.")
-    # Basic check for model usability (optional but good)
+    print(f"[DETECTION] Model '{model_identifier}' loaded/downloaded successfully onto {device}.")
+    # Basic check for model usability
     if not hasattr(model, 'predict'):
          print("[DETECTION] Warning: Loaded model might not have a 'predict' method.")
-         model = None # Invalidate model if predict is missing
-    # Check for names attribute needed later (optional, handled in detect_objects)
-    # if not hasattr(model, 'names') or not model.names:
-    #       print("[DETECTION] Warning: model.names not found after loading.")
+         model = None # Invalidate model
 
 except Exception as e:
-    print(f"[DETECTION] Error loading model '{model_identifier}': {e}")
+    print(f"[DETECTION] Error loading/downloading model '{model_identifier}': {e}")
     print(traceback.format_exc())
     model = None # Ensure model is None if loading fails
 
@@ -55,19 +50,16 @@ def detect_objects(frame, confidence_threshold=0.3):
         supervision.Detections: Detected objects filtered for class 0 and confidence,
                                 or sv.Detections.empty() if no valid detections or error.
     """
-    # Use the 'model' variable defined globally in this module
-    global model
+    global model # Access the module-level model variable
     if model is None:
-        print("[DETECTION] Error: Model is not loaded (was None at module level).")
+        print("[DETECTION] Error: Model is not loaded (was None after initialization attempt).")
         return sv.Detections.empty()
 
     try:
-        # Perform inference, explicitly asking for class 0 (person)
-        # Note: Ensure your yolo11n model has 'person' as class 0
+        # Perform inference
         results = model(frame, classes=[0], conf=confidence_threshold, device=device, verbose=False)
 
         if results and results[0].boxes:
-             # Convert results directly to supervision.Detections format
              detections = sv.Detections.from_ultralytics(results[0])
              # Ensure required attributes exist after conversion
              if detections.xyxy is None: detections.xyxy = np.empty((0, 4))
@@ -75,9 +67,8 @@ def detect_objects(frame, confidence_threshold=0.3):
              if detections.class_id is None: detections.class_id = np.empty((0,))
              return detections
         else:
-            return sv.Detections.empty() # No detections found
+            return sv.Detections.empty()
 
     except Exception as e:
         print(f"[DETECTION] Error during model prediction or conversion: {e}")
-        # print(traceback.format_exc()) # Optional: uncomment for detailed error
         return sv.Detections.empty()
