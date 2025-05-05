@@ -9,7 +9,7 @@ import traceback
 # Import necessary functions
 from football_utils.detection import detect_objects
 from football_utils.tracking import calculate_optical_flow, apply_perspective_transform
-from football_utils.team_assignment import assign_teams # Import the updated function
+from football_utils.team_assignment import assign_teams  # Import the updated function
 from football_utils.llm_inference import classify_output
 
 # --- Configuration ---
@@ -29,6 +29,70 @@ def is_likely_referee(roi):
         # print(f"Potential referee detected, avg color: {avg_color}") # Debug
         return True
     return False
+
+def detect_horizontal_lines(frame, threshold=100, min_line_length=100):
+    """Detect horizontal lines (like fences) in the frame."""
+    # Convert to grayscale and apply edge detection
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    edges = cv2.Canny(gray, 50, 150, apertureSize=3)
+    
+    # Detect lines using HoughLinesP
+    lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold, minLineLength=min_line_length, maxLineGap=10)
+    
+    # Filter for mostly horizontal lines
+    horizontal_lines = []
+    if lines is not None:
+        for line in lines:
+            x1, y1, x2, y2 = line[0]
+            # Check if line is mostly horizontal (small vertical change)
+            if abs(y2 - y1) < 20:  # Adjust this threshold as needed
+                horizontal_lines.append((x1, y1, x2, y2))
+    
+    return horizontal_lines
+
+def is_near_fence_line(box, frame_height, frame_width, fence_positions=None, horizontal_lines=None):
+    """Check if detection is near a fence line using either predefined positions or detected lines."""
+    x1, y1, x2, y2 = box
+    
+    # Method 1: Position-based fence detection
+    if fence_positions:
+        for fence in fence_positions:
+            fence_y = fence.get('y_percent', 0.39) * frame_height
+            fence_height = fence.get('height_percent', 0.05) * frame_height
+            buffer_above = fence.get('buffer_above', 0.0) * frame_height
+            buffer_below = fence.get('buffer_below', 0.05) * frame_height
+            
+            # Check if bottom of detection is in fence region
+            if (y2 >= fence_y - buffer_above and 
+                y2 <= fence_y + fence_height + buffer_below):
+                return True
+    
+    # Method 2: Detected line-based approach
+    elif horizontal_lines:
+        box_bottom_y = y2
+        for x1_line, y1_line, x2_line, y2_line in horizontal_lines:
+            # Find average y position of the line
+            line_y = (y1_line + y2_line) / 2
+            # Check if bottom of detection is near the line
+            if abs(box_bottom_y - line_y) < 20:  # Adjust threshold as needed
+                return True
+    
+    return False
+
+def is_in_field_region(box, frame_height, frame_width, field_region):
+    """Check if detection is in the main playing field."""
+    x1, y1, x2, y2 = box
+    box_center_x = (x1 + x2) / 2
+    box_center_y = (y1 + y2) / 2
+    
+    in_field = (
+        box_center_y > field_region['top'] * frame_height and
+        box_center_y < field_region['bottom'] * frame_height and
+        box_center_x > field_region['left'] * frame_width and
+        box_center_x < field_region['right'] * frame_width
+    )
+    
+    return in_field
 
 def process_video(input_video_path, output_folder):
     log_prefix = "[PROCESS_VIDEO_FINAL] "
@@ -61,6 +125,20 @@ def process_video(input_video_path, output_folder):
     if not out.isOpened():
         print(f"{log_prefix}Error: Failed to open VideoWriter (mp4v/MP4)."); cap.release(); return None, "VideoWriter Open Error"
     else: print(f"{log_prefix}VideoWriter opened successfully (mp4v).")
+    
+    # Field region definition for player filtering
+    FIELD_REGION = {
+        'top': 0.45,        # Vertical position below fence
+        'bottom': 0.90,     # Bottom of field
+        'left': 0.05,       # Left edge with small margin
+        'right': 0.95       # Right edge with small margin
+    }
+    
+    # Fence positions for spectator filtering
+    FENCE_POSITIONS = [
+        {'y_percent': 0.39, 'height_percent': 0.05, 'buffer_above': 0.00, 'buffer_below': 0.05},  # Main fence line
+        {'y_percent': 0.45, 'height_percent': 0.05, 'buffer_above': 0.00, 'buffer_below': 0.05},  # Secondary fence line
+    ]
 
     # --- Initialize processing variables ---
     frame_num = 0
@@ -85,6 +163,9 @@ def process_video(input_video_path, output_folder):
                  print(f"{log_prefix}Processing frame {frame_num}/{total_frames_str}...")
 
             try:
+                # Detect horizontal lines for spectator filtering
+                horizontal_lines = detect_horizontal_lines(frame)
+            
                 # 1. Object Detection
                 all_detections = detect_objects(frame)
 
@@ -96,33 +177,47 @@ def process_video(input_video_path, output_folder):
                 for i, det in enumerate(all_detections):
                      # Check it's a person above confidence threshold
                      if det['name'] == 'person' and det['confidence'] >= PERSON_CONF_THRESHOLD:
-                          # --- Simple Referee Check ---
+                          # Get box coordinates
                           xmin, ymin, xmax, ymax = int(det['xmin']), int(det['ymin']), int(det['xmax']), int(det['ymax'])
+                          box = [xmin, ymin, xmax, ymax]
+                          
+                          # Skip if near fence line (spectator)
+                          if is_near_fence_line(box, height, width, FENCE_POSITIONS, horizontal_lines):
+                              continue
+                              
+                          # Check if in valid field region
+                          if not is_in_field_region(box, height, width, FIELD_REGION):
+                              continue
+                          
                           # Take central ROI to check color (avoid boots/head)
                           box_h = ymax - ymin; box_w = xmax - xmin
                           roi_ymin_ref = ymin + int(box_h * 0.2); roi_ymax_ref = ymax - int(box_h * 0.2)
                           roi_xmin_ref = xmin + int(box_w * 0.2); roi_xmax_ref = xmax - int(box_w * 0.2)
+                          
                           if roi_ymin_ref < roi_ymax_ref and roi_xmin_ref < roi_xmax_ref: # Check valid ROI dims
                               roi_ref = frame[roi_ymin_ref:roi_ymax_ref, roi_xmin_ref:roi_xmax_ref]
-                              if not is_likely_referee(roi_ref):
-                                   # If not likely a referee, add to player list
-                                   filtered_idx = len(player_detections) # Index in the filtered list
-                                   player_detections.append(det)
-                                   player_indices_map[filtered_idx] = i # Map filtered index -> original index
-                                   original_indices[i] = filtered_idx # Map original index -> filtered index
-                              # else: print(f"Filtered potential referee at original index {i}") # Debug
-                          else:
-                              # If ROI is invalid, assume it's a player for now
-                              filtered_idx = len(player_detections)
-                              player_detections.append(det)
-                              player_indices_map[filtered_idx] = i
-                              original_indices[i] = filtered_idx
+                              if is_likely_referee(roi_ref):
+                                   # If likely a referee, skip
+                                   continue
+                                   
+                          # If it passes all filters, add to player list
+                          filtered_idx = len(player_detections) # Index in the filtered list
+                          player_detections.append(det)
+                          player_indices_map[filtered_idx] = i # Map filtered index -> original index
+                          original_indices[i] = filtered_idx # Map original index -> filtered index
 
                 # --------------------------
 
                 # 3. Team Assignment (using filtered player detections)
                 # assign_teams expects list of detections; returns dict mapping *filtered index* -> team_id
-                team_assignments_filtered_idx = assign_teams(frame, player_detections)
+                team_assignments_result = assign_teams(frame, player_detections)
+                
+                # Handle different return formats from assign_teams
+                if isinstance(team_assignments_result, tuple) and len(team_assignments_result) == 2:
+                    team_assignments_filtered_idx, team_colors = team_assignments_result
+                else:
+                    team_assignments_filtered_idx = team_assignments_result
+                    team_colors = [(255, 0, 0), (0, 0, 255)]  # Default blue/red colors
 
                 # Convert team assignment keys back to original detection indices for drawing
                 team_assignments_original_idx = {
@@ -130,7 +225,6 @@ def process_video(input_video_path, output_folder):
                     for filtered_idx, team_id in team_assignments_filtered_idx.items()
                     if filtered_idx in player_indices_map # Ensure mapping exists
                 }
-                # print(f"Orig Idx Teams: {team_assignments_original_idx}") # Debug
 
                 # --- 4. Optical Flow (Optional - consider disabling) ---
                 flow = calculate_optical_flow(prev_frame, frame) if prev_frame is not None else None
@@ -161,19 +255,19 @@ def process_video(input_video_path, output_folder):
                          cv2.putText(display_frame, f"{label} ({conf:.2f})", (xmin, ymin - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
                 # -----------------------------------------------
 
-
                 # --- Write the processed frame ---
                 try:
                     out.write(display_frame)
                 except Exception as write_err:
-                    # ... (handle write errors as before) ...
-                    write_errors += 1; print(...)
+                    write_errors += 1
+                    print(f"{log_prefix}Error writing frame: {write_err}")
 
                 prev_frame = frame.copy()
 
             except Exception as frame_proc_err:
                 # ... (handle frame processing errors) ...
                 print(f"{log_prefix}Error processing frame {frame_num}: {frame_proc_err}")
+                traceback.print_exc()
                 processing_successful = False # Mark as failed if one frame fails badly
 
         # End of while loop
@@ -181,7 +275,9 @@ def process_video(input_video_path, output_folder):
 
     except Exception as loop_err:
         # ... (handle outer loop errors) ...
-        print(f"{log_prefix}Error in loop: {loop_err}"); processing_successful = False
+        print(f"{log_prefix}Error in loop: {loop_err}")
+        traceback.print_exc()
+        processing_successful = False
     finally:
         # --- Release Resources ---
         print(f"{log_prefix}Releasing resources...")
@@ -229,4 +325,3 @@ def process_video(input_video_path, output_folder):
 
     print(f"{log_prefix}Returning path: {final_output_path}, classification: {classification_str}")
     return final_output_path, classification_str
-    
