@@ -13,6 +13,16 @@ OUTPUT_FOLDER = os.path.join(os.getcwd(), 'outputs')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
+# Available session types
+SESSION_TYPES = [
+    'Training',
+    'Match',
+    'Recovery',
+    'Analysis',
+    'Fitness Test',
+    'Tactical Session'
+]
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
@@ -54,6 +64,11 @@ def serve_video(filename):
 @app.route("/downloads/<filename>")
 def download_file(filename):
     return send_from_directory(OUTPUT_FOLDER, filename, as_attachment=True)
+
+# API endpoint to get session types
+@app.route("/api/session_types", methods=["GET"])
+def get_session_types():
+    return jsonify({"session_types": SESSION_TYPES})
 
 # Flask Endpoint to Handle Screenshot Upload
 @app.route("/upload_screenshot", methods=["POST"])

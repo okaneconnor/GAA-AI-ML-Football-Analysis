@@ -1,0 +1,68 @@
+<!-- Filter Component -->
+<div id="filters-container" class="filters-container">
+  <div class="filters-header">
+    <h2>Filters</h2>
+    <button id="hide-filters" class="btn btn-sm">Hide</button>
+  </div>
+  
+  <div class="filters-body">
+    <div class="filter-group">
+      <label for="pitch-filter">Pitch</label>
+      <select id="pitch-filter" name="pitch">
+        <option value="">All Pitches</option>
+        <option value="Main Pitch">Main Pitch</option>
+        <option value="Training Ground">Training Ground</option>
+        <option value="Indoor Facility">Indoor Facility</option>
+      </select>
+    </div>
+    
+    <div class="filter-group">
+      <label for="date-filter">Date</label>
+      <input type="date" id="date-filter" name="date">
+      <div id="date-display" class="date-display"></div>
+    </div>
+    
+    <div class="filter-group">
+      <label for="session-type-filter">Session Type</label>
+      <select id="session-type-filter" name="session_type">
+        <!-- Options will be populated via JavaScript -->
+      </select>
+    </div>
+  </div>
+  
+  <div class="filter-controls">
+    <a href="#" id="clear-filters" class="btn-link">Clear Filters</a>
+    <div class="filter-buttons">
+      <button id="refresh-btn" class="btn">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+          <path d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41zm-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9z"/>
+          <path fill-rule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.9A5.002 5.002 0 0 0 8 3zM3.1 9a5.002 5.002 0 0 0 8.757 2.182.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9H3.1z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Tab Navigation -->
+<div class="tab-navigation">
+  <div id="week-tab" class="tab active">Week</div>
+  <div id="month-tab" class="tab">Month</div>
+</div>
+
+<!-- Calendar Navigation -->
+<div class="calendar-nav">
+  <button id="prev-period" class="calendar-nav-btn">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+      <path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/>
+    </svg>
+  </button>
+  <h3 id="calendar-title" class="calendar-title">May 5 - May 11, 2025</h3>
+  <button id="next-period" class="calendar-nav-btn">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+      <path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
+    </svg>
+  </button>
+</div>
+
+<!-- Today Button -->
+<button id="today-btn" class="today-button">Today</button> 

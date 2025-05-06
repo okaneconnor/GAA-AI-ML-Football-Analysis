@@ -1,0 +1,255 @@
+/* Filter styles */
+.filters-container {
+  max-width: 1000px;
+  margin: 0 auto 20px;
+  padding: 15px 20px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(5px);
+}
+
+.filters-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.filters-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.filters-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 15px;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 10px;
+}
+
+.filter-group label {
+  margin-bottom: 8px;
+  font-weight: 500;
+  font-size: 1rem;
+  color: #fff;
+}
+
+/* Form elements */
+select, input[type="date"] {
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+  font-size: 14px;
+  width: 100%;
+  outline: none;
+  box-sizing: border-box;
+  cursor: pointer;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+/* Custom dropdown arrow */
+select {
+  background-image: url("data:image/svg+xml;utf8,<svg fill='white' height='24' viewBox='0 0 24 24' width='24' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/><path d='M0 0h24v24H0z' fill='none'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 30px; /* make room for the arrow */
+}
+
+/* Remove default arrow in IE */
+select::-ms-expand {
+  display: none;
+}
+
+select:focus, input[type="date"]:focus {
+  border-color: #00897b;
+  box-shadow: 0 0 0 2px rgba(0, 137, 123, 0.2);
+}
+
+/* Date display */
+.date-display {
+  margin-top: 5px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* Buttons */
+.btn {
+  background-color: #00897b;
+  color: #fff;
+  border: none;
+  padding: 8px 15px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.btn-sm {
+  padding: 5px 10px;
+  font-size: 13px;
+}
+
+.btn:hover {
+  background-color: #00796b;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.btn-link {
+  background: transparent;
+  color: #4fc3f7;
+  text-decoration: none;
+  padding: 0;
+}
+
+.btn-link:hover {
+  text-decoration: underline;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Controls area */
+.filter-controls {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.filter-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+/* Tab navigation */
+.tab-navigation {
+  display: flex;
+  gap: 5px;
+  margin: 20px auto;
+  max-width: 1000px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.tab {
+  flex: 1;
+  text-align: center;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.3s ease;
+  font-weight: 500;
+}
+
+.tab.active {
+  background: #00897b;
+}
+
+.tab:hover:not(.active) {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* Dropdown styling for team session types */
+.dropdown-list {
+  position: absolute;
+  z-index: 100;
+  width: 100%;
+  max-height: 200px;
+  overflow-y: auto;
+  background: #333;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0 0 6px 6px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.dropdown-option {
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.dropdown-option:hover, .dropdown-option.selected {
+  background: rgba(0, 137, 123, 0.2);
+}
+
+.dropdown-option.selected {
+  background: rgba(0, 137, 123, 0.4);
+}
+
+/* Calendar navigation */
+.calendar-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1000px;
+  margin: 0 auto 10px;
+}
+
+.calendar-nav-btn {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 5px 10px;
+}
+
+.calendar-nav-btn:hover {
+  color: #4fc3f7;
+}
+
+.calendar-title {
+  font-size: 1.2rem;
+  font-weight: 500;
+  margin: 0;
+}
+
+/* Today button */
+.today-button {
+  display: block;
+  width: 100%;
+  max-width: 1000px;
+  margin: 15px auto;
+  text-align: center;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.2);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.3s ease;
+}
+
+.today-button:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .filters-body {
+    grid-template-columns: 1fr;
+  }
+  
+  .filter-controls {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .filter-buttons {
+    width: 100%;
+    justify-content: space-between;
+  }
+} 
